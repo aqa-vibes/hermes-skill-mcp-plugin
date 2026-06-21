@@ -88,11 +88,11 @@ class TestSkillViewHook:
     def test_bad_paths_return_none(
         self,
         temp_skills_dir: Path,
-        case_name: str,
+        name: str,
     ) -> None:
         hook = create_hook()
 
-        if case_name == "ok_false":
+        if name == "ok_false":
             skill_dir = temp_skills_dir / "no-ok-skill"
             skill_dir.mkdir()
             (skill_dir / SKILL_FILE).write_text("# No OK\n", encoding="utf-8")
@@ -101,7 +101,7 @@ class TestSkillViewHook:
                 result=_make_skill_view_result(str(skill_dir), ok=False),
                 args={},
             )
-        elif case_name == "file_path":
+        elif name == "file_path":
             file_path = temp_skills_dir / "not-a-dir.txt"
             file_path.write_text("hello", encoding="utf-8")
             hook_output = hook(
