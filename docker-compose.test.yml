@@ -1,0 +1,19 @@
+# Hermes skill-mcp Test Compose
+# Run: docker compose -f docker-compose.test.yml up --build --abort-on-container-exit
+services:
+  hermes-test:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    image: hermes-test:latest
+    container_name: hermes-test
+
+    environment:
+      - HERMES_API_KEY=${HERMES_API_KEY:-}
+      - HERMES_API_URL=${HERMES_API_URL:-https://openrouter.ai/api/v1}
+      - HERMES_API_MODEL=${HERMES_API_MODEL:-deepseek-v4-flash}
+
+    volumes:
+      - .:/opt/hermes/src
+
+    command: ["pytest", "tests/", "-v", "-s"]

@@ -1,29 +1,46 @@
-FROM python:3.12-slim
+# ============================================
+# Hermes Agent - Test Image
+# Pure Hermes + skill-mcp plugin. No test logic.
+# Build: docker build -f Dockerfile.test -t hermes-test .
+# ============================================
+FROM python:3.11-slim
 
-# Hermes Agent dependencies (minimal set)
-RUN pip install --no-cache-dir \
-    hermes-agent \
-    mcp \
-    pyyaml \
-    pytest
+ENV PYTHONUNBUFFERED=1 \
+    PLAYWRIGHT_BROWSERS_PATH=/opt/hermes/.playwright \
+    NODE_ENV=production
 
-# Install MCP servers for testing
-RUN pip install --no-cache-dir \
-    mcp-server-time \
-    mcp-server-sqlite
+# System dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates curl git ripgrep ffmpeg gcc \
+    python3-dev libffi-dev procps openssh-client \
+    nodejs npm \
+    && rm -rf /var/lib/apt/lists/*
 
-# Create Hermes directory structure
-RUN mkdir -p /root/.hermes/{skills,memories,logs,sessions}
-COPY hermes-config.yaml /root/.hermes/config.yaml
+WORKDIR /opt/hermes
 
-# Install the plugin
-COPY . /root/.hermes/plugins/skill-mcp/
+# Install hermes-agent
+RUN pip install --no-cache-dir "hermes-agent[all,messaging]"
 
-# Create test skill with mcp.yaml
-COPY test-skill/ /root/.hermes/skills/time-skill/
+# Install test dependencies
+RUN pip install --no-cache-dir pytest pytest-asyncio
 
-# Create the test runner
-COPY test_runner.sh /
-RUN chmod +x /test_runner.sh
+# Hermes config directories
+RUN mkdir -p /opt/data/skills
+RUN mkdir -p /root/.hermes
 
-ENTRYPOINT ["/test_runner.sh"]
+# Copy plugin source into Hermes plugin dir
+RUN mkdir -p /opt/hermes/plugins/skill-mcp
+COPY __init__.py _metadata.py _config.py _connection.py _skill_view_hook.py \
+    /opt/hermes/plugins/skill-mcp/
+
+# Copy test fixtures
+COPY fixtures/magic_server.py /opt/data/magic_server.py
+COPY fixtures/secret_skill /opt/data/skills/secret-skill
+COPY fixtures/test_config.yaml /opt/data/config.yaml
+RUN chmod +x /opt/data/magic_server.py
+
+# Copy test runner
+COPY tests /opt/hermes/tests
+
+WORKDIR /opt/hermes
+CMD ["pytest", "tests/", "-v"]

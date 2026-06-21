@@ -1,0 +1,7 @@
+# Magic secret MCP server (runs local python script)
+secret:
+  command: python3
+  args: ["/opt/data/magic-server.py"]
+  env:
+    MCP_MAGIC_PHRASE: "zebra-moon-7xq9k"
+  timeout: 10

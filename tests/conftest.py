@@ -1,110 +1,49 @@
-"""Shared fixtures for hermes-skill-mcp plugin tests."""
-
-from __future__ import annotations
-
-import sys
+"""Test fixtures and shared utilities."""
+import importlib
+import os
+import subprocess
 from pathlib import Path
-_project_root = Path(__file__).resolve().parent.parent
-if str(_project_root) not in sys.path:
-    sys.path.insert(0, str(_project_root))
-
-import shutil
-import tempfile
-from unittest.mock import AsyncMock, MagicMock
-
 import pytest
 
-
-@pytest.fixture
-def temp_skills_dir() -> Path:
-    """Create a temporary skills directory, yield it, then clean up."""
-    tmp = Path(tempfile.mkdtemp(prefix="hermes-skill-mcp-test-"))
-    try:
-        yield tmp
-    finally:
-        shutil.rmtree(tmp, ignore_errors=True)
+PLUGIN_PATH = "/opt/hermes/plugins/skill-mcp"
 
 
-@pytest.fixture
-def skill_with_mcp(temp_skills_dir: Path):
-    """Factory: create a skill dir containing SKILL.md + mcp.yaml, return Path."""
-
-    def _create(name: str, mcp_config: dict | None = None) -> Path:
-        skill_dir = temp_skills_dir / name
-        skill_dir.mkdir(parents=True, exist_ok=True)
-
-        # Write SKILL.md
-        (skill_dir / "SKILL.md").write_text(
-            f"# {name}\n\nDescription of {name} skill.\n",
-            encoding="utf-8",
-        )
-
-        # Write mcp.yaml with provided or default config
-        import yaml
-
-        if mcp_config is None:
-            mcp_config = {
-                "mcpServers": {
-                    f"{name}-server": {
-                        "command": "python",
-                        "args": ["-m", f"{name}_server"],
-                    }
-                }
-            }
-        (skill_dir / "mcp.yaml").write_text(
-            yaml.safe_dump(mcp_config), encoding="utf-8"
-        )
-
-        return skill_dir
-
-    return _create
+def import_plugin_module(module_name: str):
+    """Import a module from the skill-mcp plugin directory."""
+    plugin_path = Path(PLUGIN_PATH)
+    file_name = module_name.split(".")[-1]
+    spec = importlib.util.spec_from_file_location(
+        module_name,
+        plugin_path / "{}.py".format(file_name),
+    )
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
 
 
-@pytest.fixture
-def skill_without_mcp(temp_skills_dir: Path):
-    """Factory: create a skill dir containing only SKILL.md, return Path."""
-
-    def _create(name: str) -> Path:
-        skill_dir = temp_skills_dir / name
-        skill_dir.mkdir(parents=True, exist_ok=True)
-
-        (skill_dir / "SKILL.md").write_text(
-            f"# {name}\n\nDescription of {name} skill (no MCP).\n",
-            encoding="utf-8",
-        )
-
-        return skill_dir
-
-    return _create
+@pytest.fixture(scope="session")
+def plugin_dir():
+    """Path to the installed skill-mcp plugin."""
+    path = Path(PLUGIN_PATH)
+    assert path.exists(), "Plugin not found at {}".format(path)
+    return path
 
 
-@pytest.fixture
-def mock_mcp_client() -> MagicMock:
-    """Return a MagicMock simulating an MCP client session.
-
-    - list_tools: AsyncMock returning a list of Tool dicts
-    - call_tool: AsyncMock returning CallToolResult
-    - close: AsyncMock
-    """
-    client = MagicMock()
-    client.list_tools = AsyncMock(return_value=[])
-    client.call_tool = AsyncMock(return_value=MagicMock(content=[]))
-    client.close = AsyncMock()
-    return client
+@pytest.fixture(scope="session")
+def hermes_bin():
+    """Ensure hermes CLI is available."""
+    cmd_result = subprocess.run(
+        ["which", "hermes"], capture_output=True, text=True,
+    )
+    assert cmd_result.returncode == 0, "hermes CLI not found"
+    return cmd_result.stdout.strip()
 
 
-@pytest.fixture
-def mock_plugin_context() -> MagicMock:
-    """Return a MagicMock simulating Hermes PluginContext.
-
-    Provides:
-    - register_tool: MagicMock
-    - register_hook: MagicMock
-    - manifest: MagicMock with name='hermes-skill-mcp'
-    """
-    ctx = MagicMock()
-    ctx.register_tool = MagicMock()
-    ctx.register_hook = MagicMock()
-    ctx.manifest = MagicMock()
-    ctx.manifest.name = "hermes-skill-mcp"
-    return ctx
+@pytest.fixture(scope="module")
+def e2e_config():
+    """API credentials from environment."""
+    return {
+        "key": os.environ.get("HERMES_API_KEY", ""),
+        "url": os.environ.get("HERMES_API_URL", ""),
+        "model": os.environ.get("HERMES_API_MODEL", ""),
+    }

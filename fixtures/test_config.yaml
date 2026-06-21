@@ -1,0 +1,49 @@
+# ============================================
+# Test Configuration for Hermes
+# ============================================
+
+model:
+  default: "${HERMES_API_MODEL}"
+  provider: "custom"
+  api_key: "${HERMES_API_KEY}"
+  base_url: "${HERMES_API_URL}"
+
+terminal:
+  backend: "local"
+  cwd: "."
+
+platform_toolsets:
+  cli:
+    - terminal
+    - web
+    - file
+    - skills
+    - memory
+    - todo
+
+skills:
+  creation_nudge_interval: 0
+  external_dirs:
+    - /opt/data/skills
+  guard_agent_created: false
+
+# skill-mcp plugin registers its own toolset
+# The plugin is loaded from /opt/hermes/plugins/skill-mcp/
+
+memory:
+  memory_enabled: true
+  user_profile_enabled: true
+  nudge_interval: 0
+
+compression:
+  enabled: false
+
+logging:
+  level: "INFO"
+  file: "/opt/data/logs/hermes.log"
+
+agent:
+  max_turns: 30
+  api_max_retries: 2
+  verbose: false
+  reasoning_effort: "low"
