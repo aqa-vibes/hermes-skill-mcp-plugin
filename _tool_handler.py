@@ -21,8 +21,8 @@ import re as _re
 from pathlib import Path as _Path
 from typing import Any, Callable
 
-from _config import check_mcp_sdk_available, parse_mcp_config  # noqa: WPS300
-from _security import redact_credentials  # noqa: WPS300
+import _config
+import _security
 
 logger = logging.getLogger(__name__)
 
@@ -257,7 +257,7 @@ async def _handle_skill_mcp(
 
 def _check_sdk_available() -> str | None:
     """Return error JSON string if MCP SDK is not installed."""
-    if not check_mcp_sdk_available():
+    if not _config.check_mcp_sdk_available():
         return _build_error(
             _EC_MCP_SDK_MISSING, _MSG_SDK_MISSING, retryable=False,
         )
@@ -290,7 +290,7 @@ def _resolve_skill_config(
             ),
         }
 
-    configs = parse_mcp_config(skill_dir)
+    configs = _config.parse_mcp_config(skill_dir)
     if not configs:
         return {
             _JKEY_OK: False,
@@ -380,7 +380,7 @@ def _client_err(
     return {
         _JKEY_OK: False,
         _JKEY_ERROR: _build_error(
-            error_code, redact_credentials(str(exc)), retryable=retryable,
+            error_code, _security.redact_credentials(str(exc)), retryable=retryable,
         ),
     }
 

@@ -15,6 +15,7 @@ import logging
 from pathlib import Path
 from typing import Any, Callable, Optional
 
+import _security
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
@@ -22,7 +23,9 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 _MASK_THRESHOLD = 8
-
+_DEFAULT_MCP_TIMEOUT = 60
+_DEFAULT_MCP_CONNECT_TIMEOUT = 10
+_DEFAULT_MCP_IDLE_TIMEOUT = 300
 
 # ---------------------------------------------------------------------------
 # Existing helpers — unchanged signatures
@@ -234,12 +237,12 @@ def _append_timeouts(
     lines: list[str], config: dict[str, Any],
 ) -> None:
     """Append timeout lines for a server configuration."""
-    lines.append(f"  timeout: {config.get('timeout', 60)}s")  # noqa: WPS529
+    lines.append(f"  timeout: {config.get('timeout', _DEFAULT_MCP_TIMEOUT)}s")
     lines.append(
-        f"  connect_timeout: {config.get('connect_timeout', 10)}s",  # noqa: WPS529
+        f"  connect_timeout: {config.get('connect_timeout', _DEFAULT_MCP_CONNECT_TIMEOUT)}s",
     )
     lines.append(
-        f"  idle_timeout: {config.get('idle_timeout', 300)}s",  # noqa: WPS529,WPS432
+        f"  idle_timeout: {config.get('idle_timeout', _DEFAULT_MCP_IDLE_TIMEOUT)}s",
     )
 
 
@@ -272,14 +275,13 @@ def _redact_header_value(header_value: str) -> str:
     return _fallback_mask(header_value)
 
 
-def _try_security_redact(value: str) -> str | None:
+def _try_security_redact(text: str) -> str | None:
     """Attempt credential redaction via _security module."""
     try:
-        from _security import redact_credentials  # noqa: WPS433
-    except ImportError:
+        redacted = _security.redact_credentials(text)
+    except (ImportError, AttributeError):
         return None
-    redacted = redact_credentials(value)
-    if redacted != value:
+    if redacted != text:
         return redacted
     return None
 
