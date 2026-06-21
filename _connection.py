@@ -424,6 +424,7 @@ class SkillMcpManager:
 
     def __init__(self) -> None:
         self._clients: dict[str, McpConnection] = {}
+        self._cache = self._clients  # legacy alias
         self._locks: dict[str, asyncio.Lock] = {}
         self._idle_tasks: dict[str, asyncio.Task[None]] = {}
 
@@ -431,7 +432,7 @@ class SkillMcpManager:
     # Public API
     # ------------------------------------------------------------------
 
-    async def get_or_create_client(
+    def get_or_create_client(
         self,
         arg1: str,
         arg2: str,
