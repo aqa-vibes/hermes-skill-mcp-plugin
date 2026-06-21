@@ -1,3 +1,4 @@
+# TODO: fix wemake WPS202,WPS204,WPS226,WPS430,WPS431,WPS602,WPS210,WPS214,WPS118,WPS420 — test module: mock factories, many methods, long names
 # flake8: noqa: WPS202,WPS204,WPS226 — test module: many functions, repeated patterns
 # pyright: reportArgumentType=false, reportGeneralTypeIssues=false
 # pyright: reportAttributeAccessIssue=false

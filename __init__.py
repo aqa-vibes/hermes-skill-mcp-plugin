@@ -1,5 +1,7 @@
+# flake8: noqa: WPS412
 """
 hermes-skill-mcp: Dynamic MCP server loading from Hermes skills.
+# noqa: WPS412 — plugin entrypoint must have logic
 
 A Hermes Agent plugin that lets skills declare their own MCP servers
 via a ``mcp.yaml`` sidecar file. The plugin registers a single
@@ -9,12 +11,13 @@ no global config.yaml editing, no agent restart, no tool schema bloat.
 Quick Start:
     1. Install: ``git clone <repo> ~/.hermes/plugins/skill-mcp/``
     2. Add ``mcp.yaml`` beside any SKILL.md
-    3. Agent calls ``skill_mcp(mcp_name="...", tool_name="...", arguments='...')``
+    3. Agent calls ``skill_mcp(mcp_name="...",
+        tool_name="...", arguments='...')``
 
 See BDD.md for full behavior specification.
 """
 
-# flake8: noqa: WPS202,WPS229,WPS231,WPS300
+
 from __future__ import annotations
 
 
@@ -27,29 +30,24 @@ def register(ctx):
 
     All imports deferred — no module-level ImportError without mcp SDK.
     """
-    try:
-        from ._config import check_mcp_sdk_available
-        from ._connection import SkillMcpManager
-        from ._tool_handler import SKILL_MCP_SCHEMA, create_handler
-        from ._skill_view_hook import create_hook
-    except ImportError:
-        from _config import check_mcp_sdk_available  # type: ignore[no-redef]
-        from _connection import SkillMcpManager  # type: ignore[no-redef]
-        from _tool_handler import (  # type: ignore[no-redef]
-            SKILL_MCP_SCHEMA,
-            create_handler,
-        )
-        from _skill_view_hook import create_hook  # type: ignore[no-redef]
-    manager = SkillMcpManager()
+    import _config
+    import _connection
+    import _skill_view_hook
+    import _tool_handler
+
+    manager = _connection.SkillMcpManager()
 
     ctx.register_tool(
         name="skill_mcp",
         toolset="skill-mcp",
-        schema=SKILL_MCP_SCHEMA,
-        handler=create_handler(manager),
-        check_fn=check_mcp_sdk_available,
+        schema=_tool_handler.SKILL_MCP_SCHEMA,
+        handler=_tool_handler.create_handler(manager),
+        check_fn=_config.check_mcp_sdk_available,
         is_async=True,
         emoji="\U0001f50c",
     )
 
-    ctx.register_hook("transform_tool_result", create_hook())
+    ctx.register_hook(
+        "transform_tool_result",
+        _skill_view_hook.create_hook(),
+    )

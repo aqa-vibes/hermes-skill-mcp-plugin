@@ -1,3 +1,4 @@
+# TODO: fix wemake WPS202,WPS204,WPS226,WPS430,WPS431 — test module patterns: many functions, repeated test data, mock classes
 # flake8: noqa: WPS202,WPS204,WPS402,WPS226 — test module
 """Tests for _config.py config parser."""
 from __future__ import annotations

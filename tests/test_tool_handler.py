@@ -1,3 +1,4 @@
+# TODO: fix wemake WPS202,WPS204,WPS235,WPS402,WPS226 — test module: many test cases, repeated assertions, pattern overuse
 # flake8: noqa: WPS202,WPS204,WPS235,WPS402,WPS226 — test module patterns
 from __future__ import annotations
 
