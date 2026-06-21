@@ -105,6 +105,7 @@ def _load_raw_config(
     try:  # noqa: WPS229
         import yaml
         raw_text = config_path.read_text(encoding="utf-8")
+        _detect_duplicate_keys(raw_text, config_path)
         raw_data = yaml.safe_load(raw_text)
     except Exception as exc:
         logger.warning(
@@ -118,6 +119,39 @@ def _load_raw_config(
         return None
 
     return raw_data  # type: ignore[return-value]
+
+
+def _detect_duplicate_keys(
+    raw_text: str, config_path: Path,
+) -> None:
+    """Scan raw YAML text for duplicate top-level keys, log warnings.
+
+    PyYAML silently overwrites duplicate keys. This function detects
+    them before parsing so we can warn the user.
+    """
+    seen: set[str] = set()
+    for line in raw_text.splitlines():
+        stripped = line.strip()
+        # Skip empty lines, comments, and indented (nested) lines
+        if not stripped or stripped.startswith("#"):
+            continue
+        if line[0] in (" ", "\t"):
+            continue
+        # Extract key before first colon on top-level lines
+        colon_idx = stripped.find(":")
+        if colon_idx == -1:
+            continue
+        key = stripped[:colon_idx].strip()
+        if not key:
+            continue
+        if key in seen:
+            logger.warning(
+                "skill-mcp: duplicate server name '%s' in %s",
+                key,
+                config_path,
+            )
+        else:
+            seen.add(key)
 
 
 # ---------------------------------------------------------------------------

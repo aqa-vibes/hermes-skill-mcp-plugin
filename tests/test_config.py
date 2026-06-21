@@ -498,3 +498,65 @@ class TestCheckMcpSdkAvailable:
         r2 = check_mcp_sdk_available()
         assert r1 == r2
         assert isinstance(r1, bool)
+
+
+
+class TestDuplicateServerNames:
+    """BDD 2.4/2.5: duplicate YAML key detection."""
+
+    def test_duplicate_server_names_logs_warning(
+        self, temp_skills_dir, caplog,
+    ):
+        """Duplicate top-level keys in mcp.yaml log a warning."""
+        skill_dir = temp_skills_dir / "dup-skill"
+        skill_dir.mkdir()
+        (skill_dir / "SKILL.md").write_text("# Dup\n", encoding="utf-8")
+        # Write raw YAML with duplicate keys — yaml.dump can't produce this
+        (skill_dir / "mcp.yaml").write_text(
+            "sqlite:\n"
+            "  command: uvx\n"
+            "  args: [mcp-server-sqlite]\n"
+            "sqlite:\n"
+            "  command: npx\n"
+            "  args: [other-server]\n",
+            encoding="utf-8",
+        )
+
+        with caplog.at_level(logging.WARNING):
+            result = parse_mcp_config(skill_dir)
+
+        assert any(
+            "duplicate" in record.message.lower()
+            for record in caplog.records
+        )
+        # Second definition wins (PyYAML behavior), but entry still present
+        assert "sqlite" in result
+        assert result["sqlite"]["command"] == "npx"
+
+    def test_cross_skill_duplicate_resolved_by_skill_name(
+        self, temp_skills_dir,
+    ):
+        """Same mcp_name across skills — each gets own config (BDD 2.5)."""
+        # Skill A: mcp_name="shared", args=[hello]
+        dir_a = temp_skills_dir / "skill-a"
+        dir_a.mkdir()
+        (dir_a / "SKILL.md").write_text("# Skill A\n", encoding="utf-8")
+        (dir_a / "mcp.yaml").write_text(
+            "shared:\n  command: echo\n  args: [hello]\n",
+            encoding="utf-8",
+        )
+
+        # Skill B: same mcp_name="shared", args=[world]
+        dir_b = temp_skills_dir / "skill-b"
+        dir_b.mkdir()
+        (dir_b / "SKILL.md").write_text("# Skill B\n", encoding="utf-8")
+        (dir_b / "mcp.yaml").write_text(
+            "shared:\n  command: echo\n  args: [world]\n",
+            encoding="utf-8",
+        )
+
+        result_a = parse_mcp_config(dir_a)
+        result_b = parse_mcp_config(dir_b)
+
+        assert result_a["shared"]["args"] == ["hello"]
+        assert result_b["shared"]["args"] == ["world"]
