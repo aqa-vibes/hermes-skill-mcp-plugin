@@ -7,21 +7,21 @@ No `config.yaml` editing. No restart. One tool in schema.
 ## Installation
 
 ```bash
-pip install hermes-skill-mcp-plugin
-hermes-skill-mcp install
+git clone https://github.com/aqa-vibes/hermes-skill-mcp-plugin.git \
+  ~/.hermes/plugins/skill-mcp
+hermes plugins enable skill-mcp
 ```
 
-This installs the package and registers the plugin at
-`~/.hermes/plugins/skill-mcp/`.
+Hermes auto-discovers plugins from `~/.hermes/plugins/`.
 
-Or from source:
+Verify:
 
 ```bash
-git clone https://github.com/aqa-vibes/hermes-skill-mcp-plugin
-cd hermes-skill-mcp-plugin && pip install -e .
-hermes-skill-mcp install
+hermes plugins list
+# → skill-mcp v0.1.0 (1 tool, 1 hook)
 ```
 
+## Usage
 ## Usage
 
 1. Add `mcp.yaml` beside any `SKILL.md`:
@@ -69,13 +69,17 @@ Requires Docker. Set `HERMES_API_KEY` env var for E2E tests (skipped otherwise).
 
 ```
 src/hermes_skill_mcp/
-├── __init__.py          — plugin entrypoint: register(ctx)
-├── _config.py           — mcp.yaml parser
-├── _security.py         — env filtering, credential redaction
-├── _connection.py       — MCP connection manager
-├── _tool_handler.py     — async handler pipeline
-├── _skill_view_hook.py  — transform_tool_result hook
+├── __init__.py          — register(ctx)
+├── _config.py           — mcp.yaml parser (F2)
+├── _security.py         — env filter, redaction (F7)
+├── _connection.py       — MCP manager (F3/F5)
+├── _tool_handler.py     — async handler (F4/F8)
+├── _skill_view_hook.py  — skill_view hook (F6)
+├── __main__.py          — pip-installable CLI
 └── plugin.yaml          — Hermes manifest
+```
+
+Place in `~/.hermes/plugins/skill-mcp/` and Hermes discovers it.
 ```
 
 ## License
