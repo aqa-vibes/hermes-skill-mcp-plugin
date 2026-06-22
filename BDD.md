@@ -157,6 +157,207 @@ escape:
 **Then** warning: `"skill-mcp: too many MCP servers (33), max 32. Truncated."`  
 **And** first 32 entries loaded  
 
+### Scenario 2.13: `mcp.json` with `mcpServers` wrapper (Claude Code format)
+**Given** `~/.hermes/skills/sqlite-workflow/mcp.json`:
+```json
+{
+  "mcpServers": {
+    "sqlite": {
+      "command": "uvx",
+      "args": ["mcp-server-sqlite"]
+    }
+  }
+}
+```
+**When** skill is loaded  
+**Then** plugin reads `mcp.json`  
+**And** server `"sqlite"` available for `skill_mcp(skill_name="sqlite-workflow", mcp_name="sqlite", ...)`  
+
+### Scenario 2.14: `mcp.json` flat format (auto-detect)
+**Given** `~/.hermes/skills/sqlite-workflow/mcp.json`:
+```json
+{
+  "sqlite": {
+    "command": "uvx",
+    "args": ["mcp-server-sqlite"]
+  }
+}
+```
+**When** skill is loaded  
+**Then** plugin detects flat format (no `mcpServers` key, values have `command`)  
+**And** server `"sqlite"` available  
+
+### Scenario 2.15: `mcp.json` takes priority over `mcp.yaml`
+**Given** skill has both `mcp.json` and `mcp.yaml`  
+**When** skill is loaded  
+**Then** `mcp.json` parsed  
+**And** `mcp.yaml` ignored  
+
+### Scenario 2.16: `mcp.yaml` fallback when no `mcp.json`
+**Given** skill has `mcp.yaml` but no `mcp.json`  
+**When** skill is loaded  
+**Then** `mcp.yaml` parsed as before  
+**And** backward compatibility preserved  
+
+### Scenario 2.17: `mcp.json` with explicit `type` field
+**Given** `mcp.json`:
+```json
+{
+  "mcpServers": {
+    "api": {
+      "type": "http",
+      "url": "https://mcp.example.com/v1"
+    }
+  }
+}
+```
+**When** config parsed  
+**Then** transport type detected as HTTP from explicit `type` field  
+
+### Scenario 2.18: `mcp.json` with `cwd` field
+**Given** `mcp.json`:
+```json
+{
+  "mcpServers": {
+    "lsp": {
+      "command": "node",
+      "args": ["./server.js"],
+      "cwd": "."
+    }
+  }
+}
+```
+**When** config parsed  
+**Then** `cwd` resolved relative to `mcp.json` directory  
+
+### Scenario 2.19: Invalid `mcp.json`
+**Given** `mcp.json` is not valid JSON  
+**When** plugin parses  
+**Then** warning: `"skill-mcp: failed to parse mcp.json in <path>: <error>"`  
+**And** no MCP servers for this skill  
+**And** skill loads normally  
+
+### Scenario 2.20: `mcp.json` with no recognizable servers
+**Given** `mcp.json`: `{"foo": "bar"}`  
+**When** config parsed  
+**Then** no `mcpServers` key and no values with `command`/`url`  
+**And** returns `{}`  
+**And** warning logged  
+
+### Scenario 2.21: MCP config in SKILL.md frontmatter
+**Given** `~/.hermes/skills/sqlite-workflow/SKILL.md`:
+```yaml
+---
+name: sqlite-workflow
+description: SQLite workflow skill
+mcp:
+  sqlite:
+    command: uvx
+    args: [mcp-server-sqlite]
+---
+Skill body.
+```
+**And** no `mcp.json` or `mcp.yaml` in skill dir  
+**When** skill is loaded  
+**Then** plugin parses `mcp:` key from frontmatter  
+**And** server `"sqlite"` available  
+
+### Scenario 2.22: Frontmatter MCP with HTTP transport
+**Given** `SKILL.md` frontmatter:
+```yaml
+---
+name: api-skill
+mcp:
+  company_api:
+    url: "https://mcp.company.com/v1"
+    headers:
+      Authorization: "Bearer ${COMPANY_API_KEY}"
+---
+```
+**When** config parsed  
+**Then** `${COMPANY_API_KEY}` expanded from env  
+**And** transport type detected as HTTP  
+
+### Scenario 2.23: Frontmatter MCP priority — below mcp.json
+**Given** skill has `mcp.json` with server `"from-json"`  
+**And** `SKILL.md` frontmatter with `mcp:` containing server `"from-frontmatter"`  
+**When** skill is loaded  
+**Then** `mcp.json` parsed  
+**And** server `"from-json"` available  
+**And** server `"from-frontmatter"` NOT available  
+
+### Scenario 2.24: Frontmatter MCP priority — above mcp.yaml
+**Given** skill has `SKILL.md` frontmatter with `mcp:` containing server `"from-frontmatter"`  
+**And** `mcp.yaml` with server `"from-yaml"`  
+**And** no `mcp.json`  
+**When** skill is loaded  
+**Then** frontmatter parsed  
+**And** server `"from-frontmatter"` available  
+**And** server `"from-yaml"` NOT available  
+
+### Scenario 2.25: SKILL.md without `mcp:` key — fallback to mcp.yaml
+**Given** `SKILL.md` frontmatter without `mcp:` key  
+**And** `mcp.yaml` with server `"sqlite"`  
+**And** no `mcp.json`  
+**When** skill is loaded  
+**Then** `mcp.yaml` parsed (frontmatter has no `mcp:` key)  
+
+### Scenario 2.26: SKILL.md without frontmatter — no MCP from frontmatter
+**Given** `SKILL.md` starts with `# My Skill` (no `---` frontmatter)  
+**And** no `mcp.json`, no `mcp.yaml`  
+**When** skill is loaded  
+**Then** no MCP servers from frontmatter  
+**And** no error  
+
+### Scenario 2.27: Malformed YAML in frontmatter
+**Given** `SKILL.md` frontmatter has invalid YAML  
+**When** plugin parses  
+**Then** warning: `"skill-mcp: failed to parse frontmatter in <path>: <error>"`  
+**And** no MCP servers from frontmatter  
+**And** skill loads normally  
+
+### Scenario 2.28: `mcp:` value not a dict
+**Given** `SKILL.md` frontmatter:
+```yaml
+---
+name: bad-skill
+mcp: "not a dict"
+---
+```
+**When** plugin parses  
+**Then** warning logged  
+**And** no MCP servers from frontmatter  
+
+### Scenario 2.29: SSE transport in config
+**Given** `mcp.json`:
+```json
+{
+  "mcpServers": {
+    "remote-sse": {
+      "type": "sse",
+      "url": "https://mcp.example.com/sse",
+      "headers": {
+        "Authorization": "Bearer ${API_KEY}"
+      }
+    }
+  }
+}
+```
+**When** config parsed  
+**Then** `${API_KEY}` expanded from env  
+**And** transport type detected as SSE  
+
+### Scenario 2.30: SSE type with command — rejected
+**Given** config has `type: "sse"` AND `command: "some-cmd"`  
+**When** config parsed  
+**Then** server entry rejected  
+**And** warning: `"skill-mcp: server 'X' has type 'sse' but includes command — skipped"`  
+
+### Scenario 2.31: SSE type without url — rejected
+**Given** config has `type: "sse"` but no `url`  
+**When** config parsed  
+**Then** server entry rejected  
+**And** warning: `"skill-mcp: server 'X' has type 'sse' but no url — skipped"`  
 ---
 
 ## Feature 3: `skill_mcp` Tool — Happy Path
@@ -198,6 +399,12 @@ escape:
 **When** tool executes  
 **Then** dict used directly  
 
+### Scenario 3.7: SSE transport
+**Given** `mcp.json` has server with `type: "sse"`, `url: "https://mcp.example.com/sse"`  
+**When** `skill_mcp(skill_name="remote-skill", mcp_name="sse-server", tool_name="ping")`  
+**Then** SSE transport used (not HTTP/StreamableHTTP)  
+**And** headers from config sent  
+**And** SSE connection cached with key `{session_id}:{skill_name}:{mcp_name}`  
 ---
 
 ## Feature 4: `skill_mcp` Tool — Error Cases
@@ -313,6 +520,25 @@ escape:
 {"ok": false, "error_code": "NO_SESSION", "message": "No active session for skill MCP call.", "retryable": false}
 ```
 
+### Scenario 4.16: SSE connect failure
+**Given** SSE server at unreachable URL  
+**When** `skill_mcp(...)`  
+**Then** error:
+```json
+{"ok": false, "error_code": "MCP_CONNECT_FAILED", "message": "Failed to connect to MCP server 'X': <details>", "retryable": true}
+```
+
+### Scenario 4.17: SSE type with command — rejected
+**Given** config has `type: "sse"` AND `command: "some-cmd"`  
+**When** config parsed  
+**Then** server entry rejected  
+**And** warning: `"skill-mcp: server 'X' has type 'sse' but includes command — skipped"`  
+
+### Scenario 4.18: SSE type without url — rejected
+**Given** config has `type: "sse"` but no `url`  
+**When** config parsed  
+**Then** server entry rejected  
+**And** warning: `"skill-mcp: server 'X' has type 'sse' but no url — skipped"`  
 ---
 
 ## Feature 5: Connection Lifecycle
@@ -372,6 +598,17 @@ escape:
 {"ok": false, "error_code": "MCP_CAPABILITY_MISSING", "message": "MCP server 'X' does not support tools capability.", "retryable": false}
 ```
 
+### Scenario 5.10: SSE idle cleanup
+**Given** SSE connection cached, last used 5+ min ago  
+**When** cleanup timer fires  
+**Then** SSE connection closed  
+**And** next call creates fresh connection  
+
+### Scenario 5.11: SSE concurrent — same server serialized
+**Given** one SSE connection to `"remote-sse"`  
+**When** two parallel calls to same server  
+**Then** calls serialized via `asyncio.Lock`  
+**And** both results correct (no corruption)  
 ---
 
 ## Feature 6: `skill_view` Augmentation
@@ -558,23 +795,43 @@ bad:
 
 ---
 
-## Feature 11: Configuration Schema (`mcp.yaml` reference)
+## Feature 11: Configuration Schema (config reference)
+
+### Config sources (priority order)
+
+1. `mcp.json` — JSON, Claude Code compatible (`{"mcpServers": {...}}` wrapper or flat auto-detect)
+2. `SKILL.md` frontmatter `mcp:` key — YAML, embedded in skill file
+3. `mcp.yaml` — YAML, legacy format
 
 ### Valid fields per server entry
 
 ```yaml
 server_name:
+  type: "stdio|http|sse"     # transport type (optional, inferred from command/url)
   command: "string"           # stdio: executable (REQUIRED for stdio)
   args: ["string", ...]       # stdio: arguments (default: [])
   env: {KEY: "value"}         # stdio: extra env vars (default: {})
-  url: "string"               # HTTP: server URL (REQUIRED for HTTP)
-  headers: {Key: "value"}     # HTTP: extra headers (default: {})
+  url: "string"               # http/sse: server URL (REQUIRED for http/sse)
+  headers: {Key: "value"}     # http/sse: extra headers (default: {})
+  cwd: "string"               # stdio: working directory (optional, resolved relative to config)
   timeout: 60                 # per-tool-call timeout, seconds (default: 60)
   connect_timeout: 10         # connection timeout, seconds (default: 10)
   idle_timeout: 300           # idle cleanup timeout, seconds (default: 300)
 ```
 
-**Either `command` OR `url` required. Not both.**
+### Transport type rules
+
+| `type` field | `command` present | `url` present | Result |
+|---|---|---|---|
+| `"stdio"` | required | must NOT have | stdio |
+| `"http"` | must NOT have | required | HTTP/StreamableHTTP |
+| `"sse"` | must NOT have | required | SSE |
+| not set | yes | no | stdio (inferred) |
+| not set | no | yes | HTTP (inferred) |
+| not set | yes | yes | rejected |
+
+If `type` is omitted, transport is inferred from `command`/`url` presence.
+`command` and `url` are mutually exclusive (unless `type` explicitly set).
 
 ---
 

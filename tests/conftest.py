@@ -1,11 +1,12 @@
 """Test fixtures and shared utilities."""
 import importlib
+import json
 import os
 import subprocess
 from pathlib import Path
 import pytest
 
-PLUGIN_PATH = "/opt/hermes/plugins/hermes_skill_mcp"
+PLUGIN_PATH = str(Path(__file__).parent.parent / "src" / "hermes_skill_mcp")
 
 
 def import_plugin_module(module_name: str):
@@ -85,4 +86,47 @@ def skill_without_mcp(tmp_path):
         )
         return skill_dir
 
+    return _create
+
+
+@pytest.fixture
+def skill_with_mcp_json(tmp_path):
+    """Fixture factory: create temp skill dir with mcp.json."""
+    import json
+
+    def _create(skill_name, mcp_config=None, format_type="wrapper"):
+        skill_dir = tmp_path / skill_name
+        skill_dir.mkdir(exist_ok=True)
+        (skill_dir / "SKILL.md").write_text("# {}\n".format(skill_name))
+        if mcp_config is not None:
+            mcp_json_path = skill_dir / "mcp.json"
+            if format_type == "wrapper":
+                json_data = {"mcpServers": mcp_config}
+            elif format_type == "flat":
+                json_data = mcp_config
+            else:
+                raise ValueError("format_type must be 'wrapper' or 'flat'")
+            mcp_json_path.write_text(json.dumps(json_data, indent=2))
+        return skill_dir
+    return _create
+
+
+@pytest.fixture
+def skill_with_frontmatter_mcp(tmp_path):
+    """Fixture factory: create temp skill dir with mcp: in SKILL.md frontmatter."""
+    def _create(skill_name, mcp_config=None, frontmatter_extra=None):
+        skill_dir = tmp_path / skill_name
+        skill_dir.mkdir(exist_ok=True)
+
+        import yaml
+        fm_data = {"name": skill_name, "description": "Test skill"}
+        if frontmatter_extra:
+            fm_data.update(frontmatter_extra)
+        if mcp_config is not None:
+            fm_data["mcp"] = mcp_config
+
+        frontmatter = yaml.dump(fm_data, default_flow_style=False)
+        skill_md = skill_dir / "SKILL.md"
+        skill_md.write_text("---\n{}---\n# {}\n".format(frontmatter, skill_name))
+        return skill_dir
     return _create

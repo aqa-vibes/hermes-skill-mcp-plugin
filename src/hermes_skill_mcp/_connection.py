@@ -36,6 +36,7 @@ _KEY_COMMAND = "command"
 _KEY_ARGS = "args"
 _KEY_ENV = "env"
 _KEY_HEADERS = "headers"
+_KEY_TYPE = "type"
 
 # ---------------------------------------------------------------------------
 # Dataclass
@@ -103,7 +104,8 @@ def _import_mcp():
     """Import MCP modules lazily, return type dict.
 
     Returns dict with keys: client_cls, server_params_cls,
-    stdio_client_fn, http_client_fn, read_req_cls, get_prompt_cls.
+    stdio_client_fn, http_client_fn, sse_client_fn,
+    read_req_cls, get_prompt_cls.
     """
     try:
         from mcp import (  # noqa: WPS433
@@ -113,6 +115,7 @@ def _import_mcp():
         from mcp.client.streamable_http import (
             streamablehttp_client,
         )
+        from mcp.client.sse import sse_client
         from mcp.types import GetPromptRequest, ReadResourceRequest
     except ImportError as exc:
         raise RuntimeError(
@@ -124,6 +127,7 @@ def _import_mcp():
         "server_params_cls": StdioServerParameters,
         "stdio_client_fn": stdio_client,
         "http_client_fn": streamablehttp_client,
+        "sse_client_fn": sse_client,
         "read_req_cls": ReadResourceRequest,
         "get_prompt_cls": GetPromptRequest,
     }
@@ -209,6 +213,30 @@ async def _create_http_session(
     return session
 
 
+async def _create_sse_session(
+    conn: McpConnection, server_config: dict,
+) -> Any:
+    """Create an MCP session over SSE transport."""
+    mcp_types = _import_mcp()
+
+    url = server_config[_KEY_URL]
+    headers = server_config.get(_KEY_HEADERS, {})
+    timeout = server_config.get(
+        _KEY_CONNECT_TIMEOUT, _DEFAULT_CONNECT_TIMEOUT,
+    )
+    conn._transport_ctx = mcp_types["sse_client_fn"](
+        url, headers=headers, timeout=timeout,
+    )
+    read_stream, write_stream = (
+        await conn._transport_ctx.__aenter__()
+    )
+    conn._session_ctx = mcp_types["client_cls"](
+        read_stream, write_stream,
+    )
+    session = await conn._session_ctx.__aenter__()
+    await _initialize_session(session, conn.mcp_name)
+    return session
+
 async def _establish_connection(
     manager: SkillMcpManager,
     conn: McpConnection,
@@ -217,7 +245,11 @@ async def _establish_connection(
     """Route to stdio or HTTP, init, cache tools, schedule idle."""
     try:
         server_config = conn.server_config
-        if _KEY_URL in server_config:
+        entry_type = server_config.get(_KEY_TYPE)
+
+        if entry_type == "sse":
+            session = await _create_sse_session(conn, server_config)
+        elif _KEY_URL in server_config:
             session = await _create_http_session(conn, server_config)
         else:
             session = await _create_stdio_session(conn, server_config)
